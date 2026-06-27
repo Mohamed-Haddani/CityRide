@@ -1,0 +1,96 @@
+# ============================================================
+#  CityRide - Configuration commune (tous profils)
+# ============================================================
+spring:
+  application:
+    name: cityride
+  profiles:
+    default: dev          # profil par defaut = dev (H2 en memoire)
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  # 8081 car le port 8080 est souvent pris par le listener Oracle (TNSLSNR / Oracle XML DB)
+  port: 8081
+  error:
+    include-message: always
+
+# --- Parametres applicatifs custom ---
+app:
+  jwt:
+    # Secret de DEV uniquement. En production : surcharger via la variable d'env APP_JWT_SECRET.
+    secret: ${APP_JWT_SECRET:Y2l0eXJpZGUtZGV2LXNlY3JldC1rZXktbXVzdC1iZS1hdC1sZWFzdC0yNTYtYml0cy1sb25n}
+    access-token-expiration: 3600000        # 1 heure (ms)
+    refresh-token-expiration: 604800000     # 7 jours (ms)
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:http://localhost:5173}
+  payment:
+    provider: ${APP_PAYMENT_PROVIDER:SIMULATED}   # SIMULATED (MVP) ou STRIPE (futur)
+    currency: ${APP_PAYMENT_CURRENCY:MAD}
+  matching:
+    # Ponderations du score de compatibilite (somme = 1.0)
+    weight-location: 0.35
+    weight-time: 0.30
+    weight-seats: 0.15
+    weight-price: 0.15
+    weight-rating: 0.05
+    max-distance-km: 15        # au-dela, proximite = 0
+    max-time-diff-minutes: 120 # au-dela, compatibilite horaire = 0
+
+# --- Documentation API (Swagger UI : http://localhost:8081/swagger-ui.html) ---
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+
+---
+# ============================================================
+#  Profil DEV : H2 en memoire (aucune installation requise)
+# ============================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:cityride;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop     # schema genere depuis les entites
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate.format_sql: true
+  h2:
+    console:
+      enabled: true             # console H2 : http://localhost:8081/h2-console
+      path: /h2-console
+  flyway:
+    enabled: false              # pas de migrations en dev (schema auto)
+
+---
+# ============================================================
+#  Profil POSTGRES : PostgreSQL + migrations Flyway
+#  Lancer avec : -Dspring-boot.run.profiles=postgres
+# ============================================================
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://localhost:5432/${DB_NAME:cityride}
+    username: ${DB_USER:cityride}
+    password: ${DB_PASSWORD:cityride}
+  jpa:
+    hibernate:
+      ddl-auto: validate        # le schema est gere par Flyway uniquement
+    open-in-view: false
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
